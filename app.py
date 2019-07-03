@@ -29,6 +29,7 @@ def get_secret():
     )
 
     try:
+        logging.info("Retrieving secrets for {}".format(secret_name))
         get_secret_value_response = client.get_secret_value(
             SecretId=secret_name
         )
@@ -43,6 +44,12 @@ def get_secret():
             raise e
         elif e.response['Error']['Code'] == 'ResourceNotFoundException':
             raise e
+        elif e.response['Error']['Code'] == 'AccessDeniedException':
+            logging.error('Task does not have access to the keys in KMS')
+            raise e
+        else:
+            # Raise anything we didn't catch
+            raise e
     else:
         return json.loads(get_secret_value_response['SecretString'])
 
@@ -52,11 +59,11 @@ def configure_app(flask_app):
     :param flask_app: the flask app
     :return: the same flask app, plus config details
     """
-    flask_app.config['SERVER_NAME'] = settings.FLASK_SERVER_NAME
     flask_app.config['SWAGGER_UI_DOC_EXPANSION'] = settings.RESTPLUS_SWAGGER_UI_DOC_EXPANSION
     flask_app.config['RESTPLUS_VALIDATE'] = settings.RESTPLUS_VALIDATE
     flask_app.config['RESTPLUS_MASK_SWAGGER'] = settings.RESTPLUS_MASK_SWAGGER
     flask_app.config['ERROR_404_HELP'] = settings.RESTPLUS_ERROR_404_HELP
+    flask_app.config['FLASK_PORT'] = settings.FLASK_PORT
     for k,v in get_secret().items():
         flask_app.config[k] = v
 
@@ -76,8 +83,7 @@ def initialize_app(flask_app):
 
 def main():
     initialize_app(app)
-    log.info('>>>>> Starting development server at http://{}/api/ <<<<<'.format(app.config['SERVER_NAME']))
-    app.run(debug=settings.FLASK_DEBUG)
+    app.run(debug=settings.FLASK_DEBUG, host='0.0.0.0', port=app.config['FLASK_PORT'])
 
 if __name__ == '__main__':
     main()
