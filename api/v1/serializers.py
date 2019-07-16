@@ -6,7 +6,11 @@ health = api.model('Health check', {
 })
 
 listing = api.model('Listing', {
-    'listing_hash': fields.String(required=True, description='The listing this upload belongs to')
+    'listing_hash': fields.String(required=True, description='The listing this upload belongs to'),
+    'file_upload': fields.String(required=False, description='File asset for a listing submitted as form-data'),
+    'file_type': fields.String(required=True, description='File content: video, image, audio, etc'),
+    'md5_sum': fields.String(required=True, description='md5 sum of the file being uploaded'),
+    'tags': fields.List(fields.String, required=False, description='Tags to categorize and describe the listing file')
 })
 
 pagination = api.model('Page results descriptor', {
