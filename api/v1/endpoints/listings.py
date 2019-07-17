@@ -6,6 +6,7 @@ import boto3
 from flask import request
 from flask_restplus import Resource
 
+import constants
 import settings
 from api.restplus import api
 from api.v1.serializers import list_of_listings
@@ -44,18 +45,16 @@ class Listing(Resource):
         """
         timings = {}
         start_time = time.time()
+        title = None
+        description = None
+        owner = None
         file_type = None
         md5_sum = None
         tags = None
         uploaded_md5 = None
-        if not request.form.get('file_type'):
-            return 'No file type specified', 400
-        else:
-            file_type = request.form.get('file_type')
-        if not request.form.get('md5_sum'):
-            return 'No md5 sum provided', 400
-        else:
-            md5_sum = request.form.get('md5_sum')
+        for item in ['title', 'description', 'license', 'file_type', 'md5_sum']:
+            if not request.form.get(item):
+                api.abort(400, (constants.MISSING_PAYLOAD_DATA % item))
         if request.form.get('tags'):
             tags = request.form.get('tags')
         for item in request.files.items():
