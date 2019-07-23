@@ -12,6 +12,7 @@ from api.restplus import api
 from api.v1.serializers import list_of_listings, new_listing
 from api.v1.parsers import endpoint_arguments, listing_arguments
 from datastore import dynamo
+from protocol import deployed
 
 LOGGING_CONFIG = os.path.join(settings.ROOT_DIR, 'logging.conf')
 logging.config.fileConfig(LOGGING_CONFIG)
@@ -65,9 +66,7 @@ class Listing(Resource):
             if not os.path.exists(destination):
                 os.makedirs(destination)
             item[1].save(f'{destination}{item[0]}')
-            with open(f'{destination}{item[0]}', 'rb') as data:
-                contents = data.read()
-                uploaded_md5 = hashlib.md5(contents).hexdigest()
+            uploaded_md5 = deployed.create_file_hash(f'{destination}{item[0]}')
             if uploaded_md5 != payload['md5_sum']:
                 api.abort(500, (constants.SERVER_ERROR % 'file upload failed'))
             local_finish = time.time()

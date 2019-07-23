@@ -1,0 +1,136 @@
+"""
+Functions for interacting with the computable protocol
+"""
+import os
+import logging.config
+from time import sleep
+from web3 import Web3
+from computable.contracts import Datatrust, Voting
+from computable.helpers.transaction import call, send
+
+import settings
+
+LOGGING_CONFIG = os.path.join(settings.ROOT_DIR, 'logging.conf')
+logging.config.fileConfig(LOGGING_CONFIG)
+log = logging.getLogger()
+
+class Protocol():
+    """
+    Class to manage all interactions with the deployed contracts
+    """
+    def __init__(self):
+        self.datatrust = None
+
+    def init_protocol(self, rpc_path, datatrust_contract, datatrust_host, voting_contract, datatrust_key, datatrust_wallet):
+        """
+        :param rpc_path: URL to the RPC provider for the network
+        :param datatrust_contract: Deployed address of the datatrust contract
+        :param datatrust_host: URL of this application. Used to submit self as datatrust
+        :param voting_contract: Deployed address of voting contract
+        :param datatrust_key: Private key for wallet
+        :param datatrust_wallet: Wallet address
+        """
+        self.w3 = self.initialize_web3(rpc_path)
+        self.datatrust_contract = datatrust_contract
+        self.datatrust_host = datatrust_host
+        self.voting_contract = voting_contract
+        self.datatrust_key = datatrust_key
+        self.datatrust_wallet = datatrust_wallet
+
+    def initialize_web3(self, rpc_path):
+        """
+        Setup the web3 provider
+        """
+        w3 = Web3(Web3.HTTPProvider(rpc_path))
+        log.info('w3 provider set')
+        return w3
+
+    def initialize_datatrust(self):
+        """
+        Confirm or create role as datatrust backend in protocol
+        """
+        log.info('Getting current datatrust address from network')
+        self.datatrust = Datatrust(self.datatrust_wallet)
+        self.datatrust.at(self.w3, self.datatrust_contract)
+
+        backend = call(self.datatrust.get_backend_address())
+        if backend == self.datatrust_wallet:
+            log.info('This server is the datatrust host. Resolving registration')
+            resolve = send(
+                self.w3, 
+                self.datatrust_key, 
+                self.datatrust.resolve_registration(
+                    self.w3.sha3(text=self.datatrust_host), {'from': self.datatrust_wallet}
+                    )
+                )
+            log.info(f'Resolved, transaction id: {resolve}')
+        else:
+            # backend not set, or is set to a different host
+            datatrust_url = call(self.datatrust.get_backend_url())
+            if datatrust_url == self.datatrust_host:
+                log.info('Server has been registered as datatrust, but not voted in')
+            else:
+                log.info('No backend or different host set. Resolving prior registrations and Submitting this one for voting')
+                datatrust_hash = self.w3.sha3(text=self.datatrust_host)
+                #TODO: Get the hash of any pending candidates and resolve before registration
+                resolve = send(
+                    self.w3, 
+                    self.datatrust_key, 
+                    self.datatrust.resolve_registration(
+                        self.w3.sha3(text=self.datatrust_host), {'from': self.datatrust_wallet}
+                        )
+                    )
+                log.info(f'Resolved any prior registration, transaction id: {resolve}')
+                register = self.register_host()
+                log.info(f'Datatrust has been registered, transaction id: {register}')
+
+    def wait_for_vote(self):
+        """
+        Check if this backend is registered as the datatrust
+        """
+        is_host = False
+        while is_host == False:
+            backend = call(self.datatrust.get_backend_url())
+            if backend != self.datatrust_host:
+                print('backend not voted in yet, waiting for votes...')
+                sleep(30)
+            else:
+                is_host = True
+        return True
+
+    def register_host(self):
+        """
+        Register a host as the datatrust in protocol
+        """
+        log.info('****Registering host****')
+        register = send(self.w3, self.datatrust_key, self.datatrust.register(self.datatrust_host, {'from': self.datatrust_wallet}))
+        voting = Voting(self.datatrust_wallet)
+        voting.at(self.w3, self.voting_contract)
+        datatrust_hash = self.w3.sha3(text=self.datatrust_host)
+        is_registered = call(voting.is_candidate(datatrust_hash))
+        if is_registered:
+            log.info(f'Backend registered with transaction {is_registered}. Voting is now open.')
+        else:
+            log.error('Host attempted to register but did not succeed')
+
+    def send_data_hash(self, listing, data_hash):
+        """
+        On a successful post to the API db, send the data hash to protocol
+        """
+        receipt = send(self.w3, self.datatrust_key, self.datatrust.set_data_hash(listing, data_hash, {'from': self.datatrust_wallet}))
+        return receipt
+
+    def create_file_hash(self, data):
+        """
+        Return a sha3 hash for the file provided
+        :param data: The file object to hash
+        :return: sha3 hash of file contents
+        :return type: string
+        """
+        sha3_hash = None
+        with open(data, 'rb') as file_contents:
+            file_contents.read()
+            sha3_hash = self.w3.sha3(file_contents)
+        return sha3_hash
+
+deployed = Protocol()
