@@ -44,7 +44,7 @@ class Listing(Resource):
     @api.response(201, constants.NEW_LISTING_SUCCESS)
     @api.response(400, constants.MISSING_PAYLOAD_DATA)
     @api.response(500, constants.SERVER_ERROR)
-    def post(self, listing_hash):
+    def post(self):
         """
         Persist a new listing to file storage, db, and protocol
         """
@@ -53,7 +53,7 @@ class Listing(Resource):
         payload = {}
         payload['listing'] = listing_hash
         uploaded_md5 = None
-        for item in ['title', 'description', 'license', 'file_type', 'md5_sum']:
+        for item in ['title', 'description', 'license', 'file_type', 'md5_sum', 'listing_hash']:
             if not request.form.get(item):
                 api.abort(400, (constants.MISSING_PAYLOAD_DATA % item))
             else:
@@ -61,7 +61,8 @@ class Listing(Resource):
         if request.form.get('tags'):
             payload['tags'] = [x.strip() for x in request.form.get('tags').split(',')]
         filenames = []
-        listing_hash = None
+        listing_hash = request.form.get('listing_hash')
+        md5_sum = request.form.get('md5_sum')
         if request.form.get('filenames'):
             filenames = request.form.get('filenames').split(',')
         for idx, item in enumerate(request.files.items()):
