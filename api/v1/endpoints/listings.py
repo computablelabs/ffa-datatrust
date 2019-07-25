@@ -51,7 +51,6 @@ class Listing(Resource):
         timings = {}
         start_time = time.time()
         payload = {}
-        payload['listing'] = listing_hash
         uploaded_md5 = None
         for item in ['title', 'description', 'license', 'file_type', 'md5_sum', 'listing_hash']:
             if not request.form.get(item):
@@ -61,7 +60,6 @@ class Listing(Resource):
         if request.form.get('tags'):
             payload['tags'] = [x.strip() for x in request.form.get('tags').split(',')]
         filenames = []
-        listing_hash = request.form.get('listing_hash')
         md5_sum = request.form.get('md5_sum')
         if request.form.get('filenames'):
             filenames = request.form.get('filenames').split(',')
