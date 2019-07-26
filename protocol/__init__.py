@@ -103,7 +103,7 @@ class Protocol():
         Register a host as the datatrust in protocol
         """
         log.info('****Registering host****')
-        register = send(self.w3, self.datatrust_key, self.datatrust.register(self.datatrust_host, {'from': self.datatrust_wallet}))
+        register = send(self.w3, self.datatrust_key, self.datatrust.register(self.datatrust_host))
         voting = Voting(self.datatrust_wallet)
         voting.at(self.w3, self.voting_contract)
         datatrust_hash = self.w3.sha3(text=self.datatrust_host)
@@ -117,7 +117,7 @@ class Protocol():
         """
         On a successful post to the API db, send the data hash to protocol
         """
-        receipt = send(self.w3, self.datatrust_key, self.datatrust.set_data_hash(listing, data_hash, {'from': self.datatrust_wallet}))
+        receipt = send(self.w3, self.datatrust_key, self.datatrust.set_data_hash(listing, data_hash))
         return receipt
 
     def create_file_hash(self, data):
