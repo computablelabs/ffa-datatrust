@@ -1,5 +1,5 @@
 # API response messages
-NEW_LISTING_SUCCESS = 'Listing successfully added'
+NEW_CANDIDATE_SUCCESS = 'Candidate successfully added'
 MISSING_PAYLOAD_DATA = 'Incomplete payload data in request: %s'
 SERVER_ERROR = 'Listing failed due to server side error: %s'
 

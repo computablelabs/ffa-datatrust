@@ -89,4 +89,4 @@ class Listing(Resource):
         db = dynamo.dynamo_conn
         db_entry = db.add_listing(payload)
         if db_entry == constants.DB_SUCCESS:
-            return {'message': constants.NEW_LISTING_SUCCESS}, 201
+            return {'message': constants.NEW_CANDIDATE_SUCCESS}, 201
