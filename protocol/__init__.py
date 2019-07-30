@@ -62,7 +62,7 @@ class Protocol():
                 self.w3, 
                 self.datatrust_key, 
                 self.datatrust.resolve_registration(
-                    self.w3.sha3(text=self.datatrust_host), {'from': self.datatrust_wallet}
+                    self.w3.sha3(text=self.datatrust_host)
                     )
                 )
             log.info(f'Resolved, transaction id: {resolve}')
