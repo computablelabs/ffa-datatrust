@@ -54,6 +54,7 @@ class Protocol():
         self.datatrust.at(self.w3, self.datatrust_contract)
 
         backend = call(self.datatrust.get_backend_address())
+        datatrust_hash = self.w3.sha3(text=self.datatrust_host)
         if backend == self.datatrust_wallet:
             log.info('This server is the datatrust host. Resolving registration')
             resolve = send(
@@ -67,18 +68,31 @@ class Protocol():
         else:
             # backend not set, or is set to a different host
             datatrust_url = call(self.datatrust.get_backend_url())
+            is_candidate = call(self.voting.is_candidate(datatrust_hash))
+            candidate_is = call(self.voting.candidate_is(datatrust_hash, 4))
             if datatrust_url == self.datatrust_host:
                 log.info('Server has been registered as datatrust, but not voted in')
+            elif is_candidate and candidate_is == 4:
+                log.info('This datatrust is a candidate but has not been voted in')
+                poll_status = call(self.voting.poll_closed(datatrust_hash))
+                if poll_status:
+                    log.info('This datatrust was a candidate, but was not voted in before the poll closed')
+                    resolve = send(
+                        self.w3, 
+                        self.datatrust_key, 
+                        self.datatrust.resolve_registration(datatrust_hash)
+                        )
+                    log.info(f'Resolved any prior registration, transaction id: {resolve}')
+                    register = self.register_host()
+                    log.info(f'Datatrust has been registered, transaction id: {register}')
+                else:
+                    log.info('This datatrust is a candidate. Voting polls are still open.')
             else:
                 log.info('No backend or different host set. Resolving prior registrations and Submitting this one for voting')
-                datatrust_hash = self.w3.sha3(text=self.datatrust_host)
-                #TODO: Get the hash of any pending candidates and resolve before registration
                 resolve = send(
                     self.w3, 
                     self.datatrust_key, 
-                    self.datatrust.resolve_registration(
-                        self.w3.sha3(text=self.datatrust_host), {'from': self.datatrust_wallet}
-                        )
+                    self.datatrust.resolve_registration(datatrust_hash)
                     )
                 log.info(f'Resolved any prior registration, transaction id: {resolve}')
                 register = self.register_host()
