@@ -8,6 +8,7 @@ from web3 import Web3
 from computable.contracts import Datatrust, Voting
 from computable.helpers.transaction import call, send
 
+import constants
 import settings
 
 LOGGING_CONFIG = os.path.join(settings.ROOT_DIR, 'logging.conf')
@@ -69,7 +70,7 @@ class Protocol():
             # backend not set, or is set to a different host
             datatrust_url = call(self.datatrust.get_backend_url())
             is_candidate = call(self.voting.is_candidate(datatrust_hash))
-            candidate_is = call(self.voting.candidate_is(datatrust_hash, 4))
+            candidate_is = call(self.voting.candidate_is(datatrust_hash, constants.PROTOCOL_REGISTRATION))
             if datatrust_url == self.datatrust_host:
                 log.info('Server has been registered as datatrust, but not voted in')
             elif is_candidate and candidate_is == 4:
