@@ -73,7 +73,7 @@ class Protocol():
             candidate_is = call(self.voting.candidate_is(datatrust_hash, constants.PROTOCOL_REGISTRATION))
             if datatrust_url == self.datatrust_host:
                 log.info('Server has been registered as datatrust, but not voted in')
-            elif is_candidate and candidate_is == 4:
+            elif is_candidate and candidate_is:
                 log.info('This datatrust is a candidate but has not been voted in')
                 poll_status = call(self.voting.poll_closed(datatrust_hash))
                 if poll_status:
@@ -132,8 +132,15 @@ class Protocol():
         """
         On a successful post to the API db, send the data hash to protocol
         """
-        receipt = send(self.w3, self.datatrust_key, self.datatrust.set_data_hash(listing, data_hash))
-        return receipt
+        datatrust_hash = self.w3.sha3(text=self.datatrust_host)
+        is_candidate = call(self.voting.is_candidate(datatrust_hash))
+        candidate_is = call(self.voting.candidate_is(datatrust_hash, constants.PROTOCOL_APPLICATION))
+        if is_candidate and candidate_is:    
+            receipt = send(self.w3, self.datatrust_key, self.datatrust.set_data_hash(listing, data_hash))
+            return receipt
+        else:
+            log.critical('This server is not the datatrust, unable to send data hash')
+            raise ValueError('Server is not the datatrust, unable to send data hash')
 
     def create_file_hash(self, data):
         """
