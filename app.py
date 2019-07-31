@@ -10,6 +10,8 @@ import settings
 from api.v1.endpoints.health import ns as health_namespace
 from api.v1.endpoints.listings import ns as listings_namespace
 from api.restplus import api
+from datastore import dynamo
+from protocol import deployed
 
 def configure_app(flask_app):
     """
@@ -36,6 +38,21 @@ def initialize_app(flask_app):
     :return: the same flask application, initialized
     """
     configure_app(flask_app)
+    db = dynamo.dynamo_conn
+    db.init_db(
+        flask_app.config['DB_URL'],
+        flask_app.config['TABLE_NAME'],
+        'us-west-1'
+    )
+    deployed.init_protocol(
+        settings.RPC_PATH,
+        settings.DATATRUST_CONTRACT,
+        settings.DATATRUST_HOST,
+        settings.VOTING_CONTRACT,
+        settings.DATATRUST_KEY,
+        settings.DATATRUST_WALLET
+    )
+    deployed.initialize_datatrust()
 
     blueprint = Blueprint('api', __name__, url_prefix='/api')
     api.init_app(blueprint)

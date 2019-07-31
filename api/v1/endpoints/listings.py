@@ -6,10 +6,13 @@ import boto3
 from flask import request
 from flask_restplus import Resource
 
+import constants
 import settings
 from api.restplus import api
-from api.v1.serializers import list_of_listings
+from api.v1.serializers import list_of_listings, new_listing
 from api.v1.parsers import endpoint_arguments, listing_arguments
+from datastore import dynamo
+from protocol import deployed
 
 LOGGING_CONFIG = os.path.join(settings.ROOT_DIR, 'logging.conf')
 logging.config.fileConfig(LOGGING_CONFIG)
@@ -26,44 +29,38 @@ class Listings(Resource):
         """
         Return a list of listings
         """
-        args = endpoint_arguments.parse_args(request)
-        page = args.get('page', 1)
-        per_page = args.get('per_page', 10)
-
-        listings = ''
-        return listings
+        # args = endpoint_arguments.parse_args(request)
+        # page = args.get('page', 1)
+        # per_page = args.get('per_page', 10)
+        db = dynamo.dynamo_conn
+        listings = db.get_all_listings()
+        print(listings)
+        return {'items': listings}, 200
 
 @ns.route('/', methods=['POST'])
 class Listing(Resource):
     @api.expect(listing_arguments)
-    @api.response(201, 'Listing successfully added')
-    @api.response(500, 'Listing failed due to server side error')
+    @api.marshal_with(new_listing)
+    @api.response(201, constants.NEW_LISTING_SUCCESS)
+    @api.response(400, constants.MISSING_PAYLOAD_DATA)
+    @api.response(500, constants.SERVER_ERROR)
     def post(self):
         """
         Persist a new listing to file storage, db, and protocol
         """
         timings = {}
         start_time = time.time()
-        file_type = None
-        md5_sum = None
-        tags = None
+        payload = {}
         uploaded_md5 = None
-        filenames = []
-        listing_hash = None
-        if not request.form.get('listing_hash'):
-            return 'No listing hash provided', 400
-        else:
-            listing_hash = request.form.get('listing_hash')
-        if not request.form.get('file_type'):
-            return 'No file type specified', 400
-        else:
-            file_type = request.form.get('file_type')
-        if not request.form.get('md5_sum'):
-            return 'No md5 sum provided', 400
-        else:
-            md5_sum = request.form.get('md5_sum')
+        for item in ['title', 'description', 'license', 'file_type', 'md5_sum', 'listing_hash']:
+            if not request.form.get(item):
+                api.abort(400, (constants.MISSING_PAYLOAD_DATA % item))
+            else:
+                payload[item] = request.form.get(item)
         if request.form.get('tags'):
-            tags = request.form.get('tags')
+            payload['tags'] = [x.strip() for x in request.form.get('tags').split(',')]
+        filenames = []
+        md5_sum = request.form.get('md5_sum')
         if request.form.get('filenames'):
             filenames = request.form.get('filenames').split(',')
         for idx, item in enumerate(request.files.items()):
@@ -77,7 +74,7 @@ class Listing(Resource):
                 contents = data.read()
                 uploaded_md5 = hashlib.md5(contents).hexdigest()
             if uploaded_md5 != md5_sum:
-                return 'File upload failed', 500
+                api.abort(500, (constants.SERVER_ERROR % 'file upload failed'))
             local_finish = time.time()
             timings['local_save'] = local_finish - start_time
             log.info(f'Saving {filename} to S3 bucket ffa-dev')
@@ -89,4 +86,7 @@ class Listing(Resource):
             timings['s3_save'] = time.time() - local_finish
             os.remove(f'{destination}{filename}')
         log.info(timings)
-        return 'You uploaded a file'
+        db = dynamo.dynamo_conn
+        db_entry = db.add_listing(payload)
+        if db_entry == constants.DB_SUCCESS:
+            return {'message': constants.NEW_CANDIDATE_SUCCESS}, 201

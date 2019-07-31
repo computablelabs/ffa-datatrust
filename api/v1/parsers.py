@@ -10,6 +10,10 @@ endpoint_arguments.add_argument('file', type=FileStorage, location='files',
                                   required=False, help='Listing asset')
 
 listing_arguments = reqparse.RequestParser(bundle_errors=True)
+listing_arguments.add_argument('title', type=str, required=True, location='form', help='Title of upload')
+listing_arguments.add_argument('description', type=str, required=True, location='form', help='Description of upload')
+listing_arguments.add_argument('owner', type=str, required=False, location='form', help='Owner of the upload')
+listing_arguments.add_argument('license', type=str, required=True, location='form', help='Usage license for upload')
 listing_arguments.add_argument('file_upload', type=FileStorage, required=True, location='files', help='Listing file asset')
 listing_arguments.add_argument('file_type', type=str, required=True, location='form', help='File type: image, video, audio, etc')
 listing_arguments.add_argument('md5_sum', type=str, required=True, location='form', help='MD5 of file asset')
