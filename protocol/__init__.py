@@ -21,6 +21,7 @@ class Protocol():
     """
     def __init__(self):
         self.datatrust = None
+        self.voting = None
 
     def init_protocol(self, rpc_path, datatrust_contract, datatrust_host, voting_contract, datatrust_key, datatrust_wallet):
         """
@@ -53,6 +54,8 @@ class Protocol():
         log.info('Getting current datatrust address from network')
         self.datatrust = Datatrust(self.datatrust_wallet)
         self.datatrust.at(self.w3, self.datatrust_contract)
+        self.voting = Voting(self.datatrust_wallet)
+        self.voting.at(self.w3, self.voting_contract)
 
         backend = call(self.datatrust.get_backend_address())
         datatrust_hash = self.w3.sha3(text=self.datatrust_host)
