@@ -86,9 +86,10 @@ class Protocol():
                         self.datatrust_key, 
                         self.datatrust.resolve_registration(datatrust_hash)
                         )
-                    log.info(f'Resolved any prior registration, transaction id: {resolve}')
+                    log.info(f'Resolved any prior registration, transaction id: {resolve.hex()}')
+                    self.wait_for_mining(resolve)
                     register = self.register_host()
-                    log.info(f'Datatrust has been registered, transaction id: {register}')
+                    log.info(f'Datatrust has been registered, transaction id: {register.hex()}')
                 else:
                     log.info('This datatrust is a candidate. Voting polls are still open.')
             else:
@@ -98,9 +99,9 @@ class Protocol():
                     self.datatrust_key, 
                     self.datatrust.resolve_registration(datatrust_hash)
                     )
-                log.info(f'Resolved any prior registration, transaction id: {resolve}')
+                log.info(f'Resolved any prior registration, transaction id: {resolve.hex()}')
+                self.wait_for_mining(resolve)
                 register = self.register_host()
-                log.info(f'Datatrust has been registered, transaction id: {register}')
 
     def wait_for_vote(self):
         """
@@ -121,13 +122,15 @@ class Protocol():
         Register a host as the datatrust in protocol
         """
         log.info('****Registering host****')
+        tx_count = self.w3.eth.getTransactionCount(self.datatrust_wallet) + 1
         register = send(self.w3, self.datatrust_key, self.datatrust.register(self.datatrust_host))
+        self.wait_for_mining(register)
         voting = Voting(self.datatrust_wallet)
         voting.at(self.w3, self.voting_contract)
         datatrust_hash = self.w3.sha3(text=self.datatrust_host)
         is_registered = call(voting.is_candidate(datatrust_hash))
         if is_registered:
-            log.info(f'Backend registered with transaction {is_registered}. Voting is now open.')
+            log.info(f'Backend registered. Voting is now open.')
         else:
             log.error('Host attempted to register but did not succeed')
 
@@ -144,6 +147,17 @@ class Protocol():
         else:
             log.critical('This server is not the datatrust, unable to send data hash')
             raise ValueError('Server is not the datatrust, unable to send data hash')
+
+    def wait_for_mining(self, tx):
+        """
+        Wait for a transaction to be mined before proceeding
+        :param tx: Transaction receipt
+        """
+        is_mined = self.w3.eth.getTransactionReceipt(tx.hex())
+        while is_mined is None:
+                    log.info('Transaction has not been mined, going to sleep')
+                    sleep(15)
+                    is_mined = self.w3.eth.getTransactionReceipt(tx.hex())
 
     def create_file_hash(self, data):
         """
