@@ -41,7 +41,7 @@ class Listings(Resource):
 class Listing(Resource):
     @api.expect(listing_arguments)
     @api.marshal_with(new_listing)
-    @api.response(201, constants.NEW_LISTING_SUCCESS)
+    @api.response(201, constants.NEW_CANDIDATE_SUCCESS)
     @api.response(400, constants.MISSING_PAYLOAD_DATA)
     @api.response(500, constants.SERVER_ERROR)
     def post(self):
