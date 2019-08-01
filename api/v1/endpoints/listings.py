@@ -77,12 +77,12 @@ class Listing(Resource):
                 api.abort(500, (constants.SERVER_ERROR % 'file upload failed'))
             local_finish = time.time()
             timings['local_save'] = local_finish - start_time
-            log.info(f'Saving {filename} to S3 bucket ffa-dev')
+            log.info(f'Saving {filename} to S3 bucket {settings.S3_DESTINATION}')
             s3 = boto3.client('s3')
             with open(f'{destination}{filename}', 'rb') as data:
                 # apparently this overwrites existing files.
                 # something to think about?
-                s3.upload_fileobj(data, 'ffa-dev', filename)
+                s3.upload_fileobj(data, settings.S3_DESTINATION, filename)
             timings['s3_save'] = time.time() - local_finish
             os.remove(f'{destination}{filename}')
         log.info(timings)
