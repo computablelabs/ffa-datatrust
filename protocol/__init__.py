@@ -122,7 +122,6 @@ class Protocol():
         Register a host as the datatrust in protocol
         """
         log.info('****Registering host****')
-        tx_count = self.w3.eth.getTransactionCount(self.datatrust_wallet) + 1
         register = send(self.w3, self.datatrust_key, self.datatrust.register(self.datatrust_host))
         self.wait_for_mining(register)
         voting = Voting(self.datatrust_wallet)
