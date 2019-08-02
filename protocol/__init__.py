@@ -89,7 +89,7 @@ class Protocol():
                     log.info(f'Resolved any prior registration, transaction id: {resolve.hex()}')
                     self.wait_for_mining(resolve)
                     register = self.register_host()
-                    log.info(f'Datatrust has been registered, transaction id: {register.hex()}')
+                    log.info(f'Datatrust has been registered.')
                 else:
                     log.info('This datatrust is a candidate. Voting polls are still open.')
             else:
