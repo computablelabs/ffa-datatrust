@@ -3,6 +3,7 @@ import logging.config
 import boto3
 from botocore.exceptions import ClientError
 from flask import Flask, Blueprint
+from flask_cors import CORS
 import json
 import os
 
@@ -65,6 +66,7 @@ def main():
     app.run(debug=settings.FLASK_DEBUG, host='0.0.0.0', port=app.config['FLASK_PORT'])
 
 app = Flask(__name__)
+CORS(app, origins='http://localhost:8080')
 LOGGING_CONFIG = os.path.join(settings.ROOT_DIR, 'logging.conf')
 logging.config.fileConfig(LOGGING_CONFIG)
 log = logging.getLogger(__name__)
