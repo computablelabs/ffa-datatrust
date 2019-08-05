@@ -57,9 +57,7 @@ class Protocol():
         self.voting = Voting(self.datatrust_wallet)
         self.voting.at(self.w3, self.voting_contract)
 
-        backend = call(self.datatrust.get_backend_address())
-        datatrust_hash = self.w3.sha3(text=self.datatrust_host)
-        if backend == self.datatrust_wallet:
+        if get_backend_address():
             log.info('This server is the datatrust host. Resolving registration')
             resolve = send(
                 self.w3, 
@@ -102,6 +100,16 @@ class Protocol():
                 log.info(f'Resolved any prior registration, transaction id: {resolve.hex()}')
                 self.wait_for_mining(resolve)
                 register = self.register_host()
+
+    def get_backend_address(self):
+        """
+        Return True if the Ethereum address for the voted-in datatrust is this datatrust
+        """
+        backend = call(self.datatrust.get_backend_address())
+        if backend == self.datatrust_wallet:
+            return True
+        else:
+            return False
 
     def wait_for_vote(self):
         """
