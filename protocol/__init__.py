@@ -57,7 +57,8 @@ class Protocol():
         self.voting = Voting(self.datatrust_wallet)
         self.voting.at(self.w3, self.voting_contract)
 
-        if get_backend_address():
+        datatrust_hash = self.w3.sha3(text=self.datatrust_host)
+        if self.get_backend_address():
             log.info('This server is the datatrust host. Resolving registration')
             resolve = send(
                 self.w3, 
@@ -145,15 +146,18 @@ class Protocol():
         """
         On a successful post to the API db, send the data hash to protocol
         """
-        datatrust_hash = self.w3.sha3(text=self.datatrust_host)
-        is_candidate = call(self.voting.is_candidate(datatrust_hash))
-        candidate_is = call(self.voting.candidate_is(datatrust_hash, constants.PROTOCOL_APPLICATION))
-        if is_candidate and candidate_is:    
-            receipt = send(self.w3, self.datatrust_key, self.datatrust.set_data_hash(listing, data_hash))
-            return receipt
+        is_candidate = call(self.voting.is_candidate(listing))
+        candidate_is = call(self.voting.candidate_is(listing, constants.PROTOCOL_APPLICATION))
+        if self.get_backend_address():
+            if is_candidate and candidate_is:    
+                receipt = send(self.w3, self.datatrust_key, self.datatrust.set_data_hash(listing, data_hash))
+                return receipt
+            else:
+                log.critical(constants.INVALID_CANDIDATE_OR_POLL_CLOSED)
+                raise ValueError(constants.INVALID_CANDIDATE_OR_POLL_CLOSED)
         else:
-            log.critical('This server is not the datatrust, unable to send data hash')
-            raise ValueError('Server is not the datatrust, unable to send data hash')
+            log.critical(constants.NOT_DATATRUST)
+            raise ValueError(constants.NOT_DATATRUST)
 
     def wait_for_mining(self, tx):
         """
@@ -175,8 +179,10 @@ class Protocol():
         """
         sha3_hash = None
         with open(data, 'rb') as file_contents:
-            file_contents.read()
-            sha3_hash = self.w3.sha3(file_contents)
+            b = file_contents.read(1024*1024) # read file in 1MB chunks
+            while b:
+                sha3_hash = self.w3.sha3(b)
+                b = file_contents.read(1024*1024)
         return sha3_hash
 
 deployed = Protocol()
