@@ -148,13 +148,9 @@ class Protocol():
         """
         is_candidate = call(self.voting.is_candidate(listing))
         candidate_is = call(self.voting.candidate_is(listing, constants.PROTOCOL_APPLICATION))
-        if self.get_backend_address():
-            if is_candidate and candidate_is:    
-                receipt = send(self.w3, self.datatrust_key, self.datatrust.set_data_hash(listing, data_hash))
-                return receipt
-            else:
-                log.critical(constants.INVALID_CANDIDATE_OR_POLL_CLOSED)
-                raise ValueError(constants.INVALID_CANDIDATE_OR_POLL_CLOSED)
+        if self.get_backend_address():   
+            receipt = send(self.w3, self.datatrust_key, self.datatrust.set_data_hash(listing, data_hash))
+            return receipt
         else:
             log.critical(constants.NOT_DATATRUST)
             raise ValueError(constants.NOT_DATATRUST)
