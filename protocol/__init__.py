@@ -3,7 +3,7 @@ Functions for interacting with the computable protocol
 """
 import os
 import logging.config
-from time import sleep
+from time import sleep, time
 from web3 import Web3
 from computable.contracts import Datatrust, Voting
 from computable.helpers.transaction import call, send
@@ -184,5 +184,30 @@ class Protocol():
                 sha3_hash = self.w3.sha3(b)
                 b = file_contents.read(1024*1024)
         return sha3_hash
+
+    def validate_candidate(self, listing_hash):
+        """
+        Verify a candidate has been submitted to Computable Protocol
+        by parsing logs for 'CandidateAdded' event and matching listing hash
+        Verify voteBy has not expired
+        :params listing_hash: String listing hash for listing
+        :return owner address if valid otherwise return None:
+        :return type string:
+        """
+        owner = None
+        voting_filter = self.voting.deployed.eventFilter(
+            constants.CANDIDATE_ADDED,{'fromBlock':0,'toBlock':'latest'}
+        )
+        events = voting_filter.get_all_entries()
+        for evt in events:
+            event_hash = '0x' + evt['args']['hash'].hex()
+            print(f'Comparing event hash {event_hash} to listing hash {listing_hash}')
+            if event_hash == listing_hash:
+                log.info(f'Listing {listing_hash} has been listed as a candidate in protocol')
+                voteBy = evt['args']['voteBy']
+                if voteBy > int(time.time()):
+                    owner = evt['args']['owner']
+        return owner
+
 
 deployed = Protocol()

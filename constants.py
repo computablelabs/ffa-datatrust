@@ -13,6 +13,7 @@ DB_ERROR = 'Error reading/writing to database'
 # Protocol constants
 PROTOCOL_APPLICATION = 1
 PROTOCOL_REGISTRATION = 4
+CANDIDATE_ADDED = 'CandidateAdded'
 
 # S3 Namespaces
 S3_CANDIDATE = 'candidate'

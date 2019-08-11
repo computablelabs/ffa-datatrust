@@ -49,29 +49,26 @@ class Listing(Resource):
         """
         Persist a new listing to file storage, db, and protocol
         """
-        # Random thoughts about setting the data hash
-        # (done) 1. This datatrust must be approved and voted in. Do this first.
         is_datatrust = deployed.get_backend_address()
         if not is_datatrust:
             api.abort(500, 'This server is not the approved datatrust. New candidates not allowed')
-        # 2. Only set the data hash after we know it is stored in S3 and dynamo
-        # (done) 3. Maybe s3 should be sub-divided: s3://owner/candidate and s3://owner/listings
-        # 4. Once a candidate is voted in, it gets moved to listing
-        # 5. If a candidate doesn't get voted in within the voting window, it is removed
-        # 6. That will require a celery worker and tracking candidates
         timings = {}
         start_time = time.time()
         payload = {}
         uploaded_md5 = None
         data_hash = None
-        for item in ['owner', 'title', 'description', 'license', 'file_type', 'md5_sum', 'listing_hash']:
+        for item in ['title', 'description', 'license', 'file_type', 'md5_sum', 'listing_hash']:
             if not request.form.get(item):
                 api.abort(400, (constants.MISSING_PAYLOAD_DATA % item))
             else:
                 payload[item] = request.form.get(item)
-        if request.form.get('tags'):
-            payload['tags'] = [x.strip() for x in request.form.get('tags').split(',')]
-        filenames = []
+                if request.form.get('tags'):
+                    payload['tags'] = [x.strip() for x in request.form.get('tags').split(',')]
+                    filenames = []
+        owner = deployed.validate_candidate(payload['listing_hash'])
+        if owner is None:
+            api.abort(428, constants.INVALID_CANDIDATE_OR_POLL_CLOSED)
+        payload['owner'] = owner
         md5_sum = request.form.get('md5_sum')
         if request.form.get('filenames'):
             filenames = request.form.get('filenames').split(',')
@@ -94,7 +91,7 @@ class Listing(Resource):
             with open(f'{destination}{filename}', 'rb') as data:
                 # apparently this overwrites existing files.
                 # something to think about?
-                s3_filename = f"{payload['owner']}/{constants.S3_CANDIDATE}/{filename}"
+                s3_filename = f"{owner}/{constants.S3_CANDIDATE}/{filename}"
                 s3.upload_fileobj(data, settings.S3_DESTINATION, s3_filename)
             timings['s3_save'] = time.time() - local_finish
             data_hash = deployed.create_file_hash(f'{destination}{filename}')
