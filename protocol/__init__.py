@@ -146,8 +146,6 @@ class Protocol():
         """
         On a successful post to the API db, send the data hash to protocol
         """
-        is_candidate = call(self.voting.is_candidate(listing))
-        candidate_is = call(self.voting.candidate_is(listing, constants.PROTOCOL_APPLICATION))
         if self.get_backend_address():   
             receipt = send(self.w3, self.datatrust_key, self.datatrust.set_data_hash(listing, data_hash))
             return receipt
