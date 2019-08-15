@@ -43,23 +43,32 @@ class Listing(Resource):
     @api.marshal_with(new_listing)
     @api.response(201, constants.NEW_CANDIDATE_SUCCESS)
     @api.response(400, constants.MISSING_PAYLOAD_DATA)
+    @api.response(428, constants.INVALID_CANDIDATE_OR_POLL_CLOSED)
     @api.response(500, constants.SERVER_ERROR)
     def post(self):
         """
         Persist a new listing to file storage, db, and protocol
         """
+        is_datatrust = deployed.get_backend_address()
+        if not is_datatrust:
+            api.abort(500, 'This server is not the approved datatrust. New candidates not allowed')
         timings = {}
         start_time = time.time()
         payload = {}
         uploaded_md5 = None
+        data_hash = None
         for item in ['title', 'description', 'license', 'file_type', 'md5_sum', 'listing_hash']:
             if not request.form.get(item):
                 api.abort(400, (constants.MISSING_PAYLOAD_DATA % item))
             else:
                 payload[item] = request.form.get(item)
-        if request.form.get('tags'):
-            payload['tags'] = [x.strip() for x in request.form.get('tags').split(',')]
-        filenames = []
+                if request.form.get('tags'):
+                    payload['tags'] = [x.strip() for x in request.form.get('tags').split(',')]
+                    filenames = []
+        owner = deployed.validate_candidate(payload['listing_hash'])
+        if owner is None:
+            api.abort(428, constants.INVALID_CANDIDATE_OR_POLL_CLOSED)
+        payload['owner'] = owner
         md5_sum = request.form.get('md5_sum')
         if request.form.get('filenames'):
             filenames = request.form.get('filenames').split(',')
@@ -82,11 +91,17 @@ class Listing(Resource):
             with open(f'{destination}{filename}', 'rb') as data:
                 # apparently this overwrites existing files.
                 # something to think about?
-                s3.upload_fileobj(data, settings.S3_DESTINATION, filename)
+                s3_filename = f"{owner}/{constants.S3_CANDIDATE}/{filename}"
+                s3.upload_fileobj(data, settings.S3_DESTINATION, s3_filename)
             timings['s3_save'] = time.time() - local_finish
+            data_hash = deployed.create_file_hash(f'{destination}{filename}')
             os.remove(f'{destination}{filename}')
         log.info(timings)
         db = dynamo.dynamo_conn
         db_entry = db.add_listing(payload)
         if db_entry == constants.DB_SUCCESS:
-            return {'message': constants.NEW_CANDIDATE_SUCCESS}, 201
+            try:
+                deployed.send_data_hash(payload['listing_hash'], data_hash)
+                return {'message': constants.NEW_CANDIDATE_SUCCESS}, 201
+            except ValueError as err:
+                api.abort(428, err)
