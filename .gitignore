@@ -1,1 +1,7 @@
 uploads
+
+# Vim files
+*.swp
+*.swo
+
+__pycache__
