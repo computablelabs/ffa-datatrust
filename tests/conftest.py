@@ -16,7 +16,7 @@ from computable.contracts import Reserve
 from computable.contracts import Datatrust
 from computable.contracts import Listing
 from computable.helpers.transaction import transact
-# import app
+import app
 
 # setup deployed protocol
 @pytest.fixture(scope="module")
@@ -191,12 +191,12 @@ def datatrust(w3, datatrust_pre, listing):
     tx_rcpt = w3.eth.waitForTransactionReceipt(tx_hash)
     return datatrust_pre
 
-#  @pytest.fixture(scope="module")
-#  def client():
-    #  """
-    #  Flask client for testing
-    #  """
-    #  app.app.config['TESTING'] = True
-    #  app.initialize_app(app.app)
-    #  client = app.app.test_client()
-    #  yield client
+@pytest.fixture(scope="module")
+def client():
+    """
+    Flask client for testing
+    """
+    app.app.config['TESTING'] = True
+    app.initialize_app(app.app)
+    client = app.app.test_client()
+    yield client

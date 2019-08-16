@@ -15,6 +15,7 @@ LOGGING_CONFIG = os.path.join(settings.ROOT_DIR, 'logging.conf')
 logging.config.fileConfig(LOGGING_CONFIG)
 log = logging.getLogger()
 
+# TODO abstract this out, as its likely to grow...
 class Protocol():
     """
     Class to manage all interactions with the deployed contracts
@@ -57,51 +58,54 @@ class Protocol():
         self.voting = Voting(self.datatrust_wallet)
         self.voting.at(self.w3, self.voting_contract)
 
-        backend = call(self.datatrust.get_backend_address())
         datatrust_hash = self.w3.sha3(text=self.datatrust_host)
-        if backend == self.datatrust_wallet:
-            log.info('This server is the datatrust host. Resolving registration')
-            resolve = send(
-                self.w3, 
-                self.datatrust_key, 
-                self.datatrust.resolve_registration(
-                    self.w3.sha3(text=self.datatrust_host)
-                    )
-                )
-            log.info(f'Resolved, transaction id: {resolve}')
+
+        if self.is_elected():
+            log.info('This server is the datatrust host')
         else:
             # backend not set, or is set to a different host
             datatrust_url = call(self.datatrust.get_backend_url())
             is_candidate = call(self.voting.is_candidate(datatrust_hash))
-            candidate_is = call(self.voting.candidate_is(datatrust_hash, constants.PROTOCOL_REGISTRATION))
             if datatrust_url == self.datatrust_host:
                 log.info('Server has been registered as datatrust, but not voted in')
-            elif is_candidate and candidate_is:
+            elif is_candidate:
                 log.info('This datatrust is a candidate but has not been voted in')
-                poll_status = call(self.voting.poll_closed(datatrust_hash))
-                if poll_status:
+                poll_closed = call(self.voting.poll_closed(datatrust_hash))
+                if poll_closed:
                     log.info('This datatrust was a candidate, but was not voted in before the poll closed')
                     resolve = send(
-                        self.w3, 
-                        self.datatrust_key, 
+                        self.w3,
+                        self.datatrust_key,
                         self.datatrust.resolve_registration(datatrust_hash)
                         )
                     log.info(f'Resolved any prior registration, transaction id: {resolve.hex()}')
+                    # TODO can likely use `wait_for_transaction_receipt` here
                     self.wait_for_mining(resolve)
                     register = self.register_host()
                     log.info(f'Datatrust has been registered.')
                 else:
                     log.info('This datatrust is a candidate. Voting polls are still open.')
             else:
-                log.info('No backend or different host set. Resolving prior registrations and Submitting this one for voting')
-                resolve = send(
-                    self.w3, 
-                    self.datatrust_key, 
-                    self.datatrust.resolve_registration(datatrust_hash)
-                    )
-                log.info(f'Resolved any prior registration, transaction id: {resolve.hex()}')
+                log.info('No backend or different host set. Resolving prior registrations (if present) and Submitting this one for voting')
+                if is_candidate:
+                    resolve = send(
+                        self.w3,
+                        self.datatrust_key,
+                        self.datatrust.resolve_registration(datatrust_hash)
+                        )
+                    log.info(f'Resolved any prior registration, transaction id: {resolve.hex()}')
                 self.wait_for_mining(resolve)
                 register = self.register_host()
+
+    def is_elected(self):
+        """
+        Return a boolean indicating if this server is the elected datatrust
+        """
+        backend = call(self.datatrust.get_backend_address())
+        if backend == self.datatrust_wallet:
+            return True
+        else:
+            return False
 
     def wait_for_vote(self):
         """
@@ -140,13 +144,14 @@ class Protocol():
         datatrust_hash = self.w3.sha3(text=self.datatrust_host)
         is_candidate = call(self.voting.is_candidate(datatrust_hash))
         candidate_is = call(self.voting.candidate_is(datatrust_hash, constants.PROTOCOL_APPLICATION))
-        if is_candidate and candidate_is:    
+        if is_candidate and candidate_is:
             receipt = send(self.w3, self.datatrust_key, self.datatrust.set_data_hash(listing, data_hash))
             return receipt
         else:
             log.critical('This server is not the datatrust, unable to send data hash')
             raise ValueError('Server is not the datatrust, unable to send data hash')
 
+    # TODO we can likely implement `wait_for_transaction_receipt` here...
     def wait_for_mining(self, tx):
         """
         Wait for a transaction to be mined before proceeding

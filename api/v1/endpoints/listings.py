@@ -43,49 +43,79 @@ class Listing(Resource):
     @api.marshal_with(new_listing)
     @api.response(201, constants.NEW_CANDIDATE_SUCCESS)
     @api.response(400, constants.MISSING_PAYLOAD_DATA)
+    @api.response(428, constants.INVALID_CANDIDATE_OR_POLL_CLOSED)
     @api.response(500, constants.SERVER_ERROR)
-    def post(self):
-        """
-        Persist a new listing to file storage, db, and protocol
-        """
-        timings = {}
-        start_time = time.time()
-        payload = {}
-        uploaded_md5 = None
-        for item in ['title', 'description', 'license', 'file_type', 'md5_sum', 'listing_hash']:
+
+    def items(self, payload={}):
+        # TODO any validation?
+        for item in ['title', 'description', 'license', 'file_type', 'md5_sum', 'listing_hash', 'tx_hash']:
             if not request.form.get(item):
                 api.abort(400, (constants.MISSING_PAYLOAD_DATA % item))
             else:
-                payload[item] = request.form.get(item)
+                if item is not 'tx_hash':
+                    payload[item] = request.form.get(item)
+
+        return payload
+
+    def tags(self, payload={}):
+        # TODO any validation?
         if request.form.get('tags'):
             payload['tags'] = [x.strip() for x in request.form.get('tags').split(',')]
-        filenames = []
+
+        return payload
+
+    def files(self, filenames=[]):
+        timings = {}
+        start_time = time.time()
+        uploaded_md5 = None
         md5_sum = request.form.get('md5_sum')
+
         if request.form.get('filenames'):
             filenames = request.form.get('filenames').split(',')
         for idx, item in enumerate(request.files.items()):
             destination = os.path.join('/tmp/uploads/')
+
+            # TODO this is a wierd line...
             filename = filenames[idx] if idx < len(filenames) else item[0]
             log.info(f'Saving {filename} to {destination}')
+
             if not os.path.exists(destination):
                 os.makedirs(destination)
+
             item[1].save(f'{destination}{filename}')
+
             with open(f'{destination}{filename}', 'rb') as data:
                 contents = data.read()
                 uploaded_md5 = hashlib.md5(contents).hexdigest()
             if uploaded_md5 != md5_sum:
                 api.abort(500, (constants.SERVER_ERROR % 'file upload failed'))
+
             local_finish = time.time()
             timings['local_save'] = local_finish - start_time
             log.info(f'Saving {filename} to S3 bucket {settings.S3_DESTINATION}')
+
             s3 = boto3.client('s3')
             with open(f'{destination}{filename}', 'rb') as data:
                 # apparently this overwrites existing files.
-                # something to think about?
+                # something to think about? TODO
                 s3.upload_fileobj(data, settings.S3_DESTINATION, filename)
             timings['s3_save'] = time.time() - local_finish
             os.remove(f'{destination}{filename}')
+
         log.info(timings)
+
+    def post(self):
+        """
+        Persist a new listing to file storage, db...
+        """
+        elected = deployed.is_elected()
+        if not elected:
+            api.abort(500, 'This server is not the elected datatrust')
+
+        payload = self.items()
+        payload = self.tags(payload)
+        self.files()
+
         db = dynamo.dynamo_conn
         db_entry = db.add_listing(payload)
         if db_entry == constants.DB_SUCCESS:
